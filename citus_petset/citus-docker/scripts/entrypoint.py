@@ -76,7 +76,7 @@ def connect_db(dbhost,dbname="template1"):
                 conn = psycopg2.connect("dbname={0} host={1} user=postgres".format(dbname, dbhost))
                 break
             except:
-                sleep(5 * poll)
+                time.sleep(5 * poll)
     if conn is None:
         raise Exception('Unable to reach the query node, failing startup')
     conn.autocommit = True
@@ -87,9 +87,10 @@ def register_in_all_db(queryhost,shardname):
     conn=connect_db(queryhost)
     cur=conn.cursor()
     # add/remove from template1
-    cur.execute("SELECT master_add_node(%s,5432)",(shardname,remove,))
+    cur.execute("SELECT master_add_node(%s,5432)",(shardname,))
     # get list of databases
-    cur.execute("SELECT string_to_array(datname::TEXT) FROM pg_database WHERE datname NOT IN ('template1','template0')")
+   
+    cur.execute("SELECT array_agg(datname::TEXT) FROM pg_database WHERE datname NOT IN ('template1','template0')")
     rows = cur.fetchall()
     dblist = rows[0]
     conn.close()
@@ -97,7 +98,7 @@ def register_in_all_db(queryhost,shardname):
     for dbname in dblist:
         conn=connect_db(queryhost,dbname)
         cur=conn.cursor()
-        cur.execute("SELECT citus_register_node(%s,5432)",(shardname))
+        cur.execute("SELECT citus_register_node(%s,5432)",(shardname,))
         conn.close()
 
     return True
@@ -124,17 +125,20 @@ if not os.path.exists('/pgdata/data/initialized'):
   conn.autocommit = True
   cur = conn.cursor()
   cur.execute("ALTER ROLE postgres PASSWORD '{0}'".format(pwds["postgres"]))
+  cur.execute("DROP DATABASE IF EXISTS citusdb")
+  cur.execute("DROP ROLE IF EXISTS admin")
+  cur.execute("DROP ROLE IF EXISTS replicator")
   cur.execute("CREATE ROLE admin PASSWORD '{0}' LOGIN CREATEDB".format(pwds["admin"]))
   cur.execute("CREATE ROLE replicator PASSWORD '{0}' LOGIN REPLICATION".format(pwds["replicator"]))
   # update template1 with citus extension and register function
-  cur.execute("CREATE EXTENSION citus")
+  cur.execute("CREATE EXTENSION IF NOT EXISTS citus")
   exec_check(["/usr/bin/psql","-f","/scripts/register_nodes.sql", "template1"])
 
   # are we the query node?  if so, set nodes in template1
   # since we might be launching as a replacement
   if thisnode.endswith("-0"):
       pod_domain = "{0}.svc.cluster.local".format(os.getenv("POD_NAMESPACE", "default"))
-      cur.execute("SELECT register_nodes(%s, %s, %s)",
+      cur.execute("SELECT citus_register_nodes(%s, %s, %s)",
         (os.getenv("SET_SIZE"),os.getenv("POD_GROUP"),pod_domain))
 
   # recreate postgres database so that it gets that stuff
@@ -148,7 +152,7 @@ if not os.path.exists('/pgdata/data/initialized'):
   # and register this node in each one
   if not thisnode.endswith("-0"):
       pod_domain = "{0}.svc.cluster.local".format(os.getenv("POD_NAMESPACE", "default"))
-      master_uri = "{0}-0.{0}.{1}".format(os.genenv("POD_GROUP"),pod_domain)
+      master_uri = "{0}-0.{0}.{1}".format(os.getenv("POD_GROUP"),pod_domain)
       thisnode_uri = "{0}.{1}.{2}".format(thisnode,os.getenv("POD_GROUP"),pod_domain)
       register_in_all_db(master_uri,thisnode_uri)
 

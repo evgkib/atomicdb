@@ -6,6 +6,6 @@ metadata:
     component: citus
 type: Opaque
 data:
-  password-superuser: YXRvbWlj
-  password-admin: YXRvbWlj
-  password-standby: YXRvbWlj
+  password-superuser: QXhpYWw=
+  password-admin: QXhpYWw=
+  password-standby: QXhpYWw=

@@ -2,7 +2,7 @@
 # citusdb clusters.  It is designed to use kubernetes to support
 # multiple nodes
 
-FROM fedora:24
+FROM fedora:27
 
 ADD ./scripts/ /scripts/
 

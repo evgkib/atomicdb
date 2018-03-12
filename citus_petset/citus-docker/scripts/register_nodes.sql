@@ -11,7 +11,7 @@ DECLARE node_uri TEXT;
 BEGIN
   FOR node_loop IN 1 .. num_nodes - 1 LOOP
     node_uri := format('%s-%s.%s.%s', app_name, node_loop, app_name, base_url);
-    SELECT node_name FROM master_get_active_worker_nodes()
+    PERFORM node_name FROM master_get_active_worker_nodes()
     WHERE node_name = node_uri;
     IF NOT FOUND THEN
       PERFORM master_add_node(node_uri, 5432);
@@ -28,7 +28,7 @@ RETURNS BOOLEAN
 LANGUAGE PLPGSQL
 AS $f$
 BEGIN
-  SELECT node_name FROM master_get_active_worker_nodes()
+  PERFORM node_name FROM master_get_active_worker_nodes()
   WHERE node_name = shard_name;
   IF NOT FOUND THEN
     PERFORM master_add_node(shard_name, 5432);
